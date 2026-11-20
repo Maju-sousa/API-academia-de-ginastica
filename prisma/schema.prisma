@@ -1,0 +1,82 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TRAINER
+  MEMBER
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(120)
+  email        String   @unique @db.VarChar(254)
+  passwordHash String   @map("password_hash")
+  role         Role     @default(MEMBER)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  member          Member?
+  createdWorkouts Workout[] @relation("WorkoutTrainer")
+
+  @@map("users")
+}
+
+model Member {
+  id        String       @id @default(uuid()) @db.Uuid
+  userId    String       @unique @map("user_id") @db.Uuid
+  phone     String?      @db.VarChar(20)
+  birthDate DateTime?    @map("birth_date") @db.Date
+  status    MemberStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workouts Workout[]
+  checkIns CheckIn[]
+
+  @@map("members")
+}
+
+model Workout {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String   @db.VarChar(120)
+  description String?  @db.Text
+  // [{ name, sets, reps, load? }]
+  exercises   Json     @default("[]")
+  memberId    String   @map("member_id") @db.Uuid
+  trainerId   String   @map("trainer_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  member  Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  trainer User   @relation("WorkoutTrainer", fields: [trainerId], references: [id])
+
+  @@index([memberId])
+  @@index([trainerId])
+  @@map("workouts")
+}
+
+model CheckIn {
+  id        String   @id @default(uuid()) @db.Uuid
+  memberId  String   @map("member_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, createdAt])
+  @@map("check_ins")
+}
